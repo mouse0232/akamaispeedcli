@@ -13,43 +13,45 @@ import (
 
 // TestConfig 测速配置
 type TestConfig struct {
-	TestOrder                  string
-	TimeULMax                  int
-	TimeDLMax                  int
-	TimeAuto                   bool
-	TimeULGraceTime            float64
-	TimeDLGraceTime            float64
-	CountPing                  int
-	URLDL                      string
-	URLUL                      string
-	URLPing                    string
-	URLGetIP                   string
-	GetIPISPInfo               bool
-	GetIPISPInfoDistance       string
-	XhrDLMultistream           int
-	XhrULMultistream           int
-	XhrMultistreamDelay        int
-	XhrIgnoreErrors            int
-	XhrDLUseBlob               bool
-	XhrULBlobMegabytes         int
-	GarbagePHPChunkSize        int
-	EnableQuirks               bool
-	PingAllowPerformanceAPI    bool
+	TestOrder               string
+	TimeULMax              int
+	TimeDLMax              int
+	TimeAuto               bool
+	TimeULGraceTime        float64
+	TimeDLGraceTime        float64
+	CountPing              int
+	URLDL                  string
+	URLUL                  string
+	URLPing                string
+	URLGetIP               string
+	GetIPISPInfo           bool
+	GetIPISPInfoDistance   string
+	XhrDLMultistream       int
+	XhrULMultistream       int
+	XhrMultistreamDelay    int
+	XhrIgnoreErrors        int
+	XhrDLUseBlob           bool
+	XhrULBlobMegabytes     int
+	GarbagePHPChunkSize    int
+	EnableQuirks           bool
+	PingAllowPerformanceAPI bool
 	OverheadCompensationFactor float64
-	UseMebibits                bool
-	TelemetryLevel             int
-	URLTelemetry               string
-	TelemetryExtra             string
+	UseMebibits            bool
+	TelemetryLevel         int
+	URLTelemetry           string
+	TelemetryExtra         string
+	ServerID               int
+	AutoSelectServer       bool
 }
 
 // TestResult 测速结果
 type TestResult struct {
-	DLSpeed  float64
-	ULSpeed  float64
-	Ping     float64
-	Jitter   float64
-	ClientIP string
-	ISPInfo  string
+	DLSpeed   float64
+	ULSpeed   float64
+	Ping      float64
+	Jitter    float64
+	ClientIP  string
+	ISPInfo   string
 }
 
 // Global variables
@@ -61,35 +63,37 @@ var (
 func init() {
 	// 默认配置，使用实际的测速服务器地址
 	config = TestConfig{
-		TestOrder:                  "IP_D_U",
-		TimeULMax:                  15,
-		TimeDLMax:                  15,
-		TimeAuto:                   true,
-		TimeULGraceTime:            3,
-		TimeDLGraceTime:            1.5,
-		CountPing:                  10,
-		URLDL:                      "https://speedtest.atlanta.linode.com/garbage.php",
-		URLUL:                      "https://speedtest.atlanta.linode.com/empty.php",
-		URLPing:                    "https://speedtest.atlanta.linode.com/empty.php",
-		URLGetIP:                   "https://speedtest.atlanta.linode.com/getIP.php",
-		GetIPISPInfo:               true,
-		GetIPISPInfoDistance:       "km",
-		XhrDLMultistream:           6,
-		XhrULMultistream:           3,
-		XhrMultistreamDelay:        300,
-		XhrIgnoreErrors:            1,
-		XhrDLUseBlob:               false,
-		XhrULBlobMegabytes:         20,
-		GarbagePHPChunkSize:        100,
-		EnableQuirks:               true,
-		PingAllowPerformanceAPI:    true,
+		TestOrder:               "IP_D_U",
+		TimeULMax:              15,
+		TimeDLMax:              15,
+		TimeAuto:               true,
+		TimeULGraceTime:        3,
+		TimeDLGraceTime:        1.5,
+		CountPing:              10,
+		URLDL:                  "https://speedtest.atlanta.linode.com/garbage.php",
+		URLUL:                  "https://speedtest.atlanta.linode.com/empty.php",
+		URLPing:                "https://speedtest.atlanta.linode.com/empty.php",
+		URLGetIP:               "https://speedtest.atlanta.linode.com/getIP.php",
+		GetIPISPInfo:           true,
+		GetIPISPInfoDistance:   "km",
+		XhrDLMultistream:       6,
+		XhrULMultistream:       3,
+		XhrMultistreamDelay:    300,
+		XhrIgnoreErrors:        1,
+		XhrDLUseBlob:           false,
+		XhrULBlobMegabytes:     20,
+		GarbagePHPChunkSize:    100,
+		EnableQuirks:           true,
+		PingAllowPerformanceAPI: true,
 		OverheadCompensationFactor: 1.06,
-		UseMebibits:                false,
-		TelemetryLevel:             0,
-		URLTelemetry:               "https://speedtest.atlanta.linode.com/telemetry/telemetry.php",
-		TelemetryExtra:             "",
+		UseMebibits:            false,
+		TelemetryLevel:         0,
+		URLTelemetry:           "https://speedtest.atlanta.linode.com/telemetry/telemetry.php",
+		TelemetryExtra:         "",
+		ServerID:               0, // 默认使用亚特兰大服务器
+		AutoSelectServer:       true, // 默认自动选择服务器
 	}
-
+	
 	// 初始化随机数种子
 	rand.Seed(time.Now().UnixNano())
 }
@@ -101,15 +105,37 @@ func main() {
 		jsonOutput = flag.Bool("json", false, "Output in JSON format")
 		simple     = flag.Bool("simple", false, "Output result only")
 		concurrent = flag.Int("c", 0, "Concurrent threads (0 for default, 1 for single-threaded)")
+		serverID   = flag.Int("server", -1, "Server ID to test against (-1 for auto-select)")
 	)
 
 	flag.Parse()
-
+	
 	// 应用用户指定的并发数
 	if *concurrent > 0 {
 		config.XhrDLMultistream = *concurrent
 		config.XhrULMultistream = *concurrent
 	}
+	
+	// 处理服务器选择
+	if *serverID >= 0 && *serverID < len(Servers) {
+		// 用户指定了服务器
+		config.ServerID = *serverID
+		config.AutoSelectServer = false
+	} else if *serverID == -1 {
+		// 用户明确要求自动选择服务器
+		config.AutoSelectServer = true
+	}
+	// 如果serverID超出范围但不是-1，则使用默认行为（使用默认服务器）
+	
+	// 如果需要自动选择服务器，则查找最近的服务器
+	if config.AutoSelectServer {
+		fmt.Print("Finding closest server... ")
+		closestServerID := findClosestServer()
+		config.ServerID = closestServerID
+		fmt.Printf("using %s\n", Servers[config.ServerID].Name)
+	}
+	
+	updateServerURLs()
 
 	if *help {
 		showHelp()
@@ -140,6 +166,18 @@ func main() {
 	}
 }
 
+// updateServerURLs 根据选择的服务器更新测速URL
+func updateServerURLs() {
+	if config.ServerID >= 0 && config.ServerID < len(Servers) {
+		baseURL := Servers[config.ServerID].URL
+		config.URLDL = baseURL + "garbage.php"
+		config.URLUL = baseURL + "empty.php"
+		config.URLPing = baseURL + "empty.php"
+		config.URLGetIP = baseURL + "getIP.php"
+		config.URLTelemetry = baseURL + "telemetry/telemetry.php"
+	}
+}
+
 func showHelp() {
 	fmt.Println("Atlanta CLI Speed Test")
 	fmt.Println("----------------------")
@@ -150,25 +188,26 @@ func showHelp() {
 	fmt.Println("")
 	fmt.Println("Examples:")
 	fmt.Println("  atlanta                  Run a standard speed test")
-	fmt.Println("  atlanta -list            List all available test servers")
-	fmt.Println("  atlanta -json            Output results in JSON format")
-	fmt.Println("  atlanta -simple          Output results only")
+	fmt.Println("  atlanta --list           List all available test servers")
+	fmt.Println("  atlanta --json           Output results in JSON format")
+	fmt.Println("  atlanta --simple         Output results only")
 	fmt.Println("  atlanta -c 10            Set concurrent threads to 10")
 	fmt.Println("  atlanta -c 1             Run in single-threaded mode")
+	fmt.Println("  atlanta --server 5        Run speed test against server ID 5")
 }
 
 func listServers() {
 	fmt.Println("Available test servers:")
-	// 这里应该从实际服务器列表获取
-	fmt.Println("1. Server A - Location A")
-	fmt.Println("2. Server B - Location B")
-	fmt.Println("3. Server C - Location C")
+	for i, server := range Servers {
+		fmt.Printf("%2d. %s - %s\n", i, server.Name, server.URL)
+	}
 }
 
 func runSpeedTest(jsonOutput, simple bool) error {
 	if !simple && !jsonOutput {
 		fmt.Println("\nStarting speed test...")
-
+		fmt.Printf("Server: %s (%s)\n", Servers[config.ServerID].Name, Servers[config.ServerID].URL)
+		
 		// 显示当前使用的并发设置
 		if config.XhrDLMultistream == config.XhrULMultistream {
 			fmt.Printf("Concurrent threads: %d\n", config.XhrDLMultistream)
@@ -266,6 +305,7 @@ func getIPInfo() {
 func printResult() {
 	fmt.Println("\nResults:")
 	fmt.Println("--------")
+	fmt.Printf("Server: %s\n", Servers[config.ServerID].Name)
 	fmt.Printf("Download: %.2f Mbps\n", result.DLSpeed)
 	fmt.Printf("Upload: %.2f Mbps\n", result.ULSpeed)
 	fmt.Printf("Ping: %.2f ms\n", result.Ping)
@@ -274,6 +314,7 @@ func printResult() {
 }
 
 func printSimpleResult() {
+	fmt.Printf("Server: %s\n", Servers[config.ServerID].Name)
 	fmt.Printf("Download: %.2f Mbps\n", result.DLSpeed)
 	fmt.Printf("Upload: %.2f Mbps\n", result.ULSpeed)
 	fmt.Printf("Ping: %.2f ms\n", result.Ping)
@@ -282,10 +323,11 @@ func printSimpleResult() {
 
 func printJSONResult() {
 	fmt.Printf(`{
+  "server": "%s",
   "download": %.2f,
   "upload": %.2f,
   "ping": %.2f,
   "jitter": %.2f,
   "ip": "%s"
-}\n`, result.DLSpeed, result.ULSpeed, result.Ping, result.Jitter, result.ClientIP)
+}\n`, Servers[config.ServerID].Name, result.DLSpeed, result.ULSpeed, result.Ping, result.Jitter, result.ClientIP)
 }

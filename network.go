@@ -34,7 +34,10 @@ type TelemetryData struct {
 func downloadWorker(ctx context.Context, wg *sync.WaitGroup, baseURL string, chunkSize int, results chan<- int64) {
 	defer wg.Done()
 
-	client := &http.Client{}
+	// 为HTTP客户端设置超时
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
 	url := fmt.Sprintf("%s%sr=%f&ckSize=%d", baseURL, urlSep(baseURL), rand.Float64(), chunkSize)
 
 	for {
@@ -67,7 +70,10 @@ func downloadWorker(ctx context.Context, wg *sync.WaitGroup, baseURL string, chu
 func uploadWorker(ctx context.Context, wg *sync.WaitGroup, baseURL string, data []byte, results chan<- int64) {
 	defer wg.Done()
 
-	client := &http.Client{}
+	// 为HTTP客户端设置超时
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
 
 	for {
 		select {
@@ -104,7 +110,10 @@ func uploadWorker(ctx context.Context, wg *sync.WaitGroup, baseURL string, data 
 func pingWorker(ctx context.Context, wg *sync.WaitGroup, baseURL string, results chan<- time.Duration) {
 	defer wg.Done()
 
-	client := &http.Client{}
+	// 为HTTP客户端设置超时
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+	}
 
 	for i := 0; i < config.CountPing; i++ {
 		select {
@@ -134,7 +143,10 @@ func pingWorker(ctx context.Context, wg *sync.WaitGroup, baseURL string, results
 
 // getIP 获取客户端IP信息
 func getIP(baseURL string) (*IPResponse, error) {
-	client := &http.Client{}
+	// 为HTTP客户端设置超时
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
 	ispParam := ""
 	if config.GetIPISPInfo {
 		ispParam = "isp=true&"
@@ -337,7 +349,10 @@ func sendTelemetry(baseURL, extra string, result TestResult) error {
 		return nil
 	}
 
-	client := &http.Client{}
+	// 为HTTP客户端设置超时
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
 	url := fmt.Sprintf("%s%sr=%f", baseURL, urlSep(baseURL), rand.Float64())
 
 	telemetry := TelemetryData{
