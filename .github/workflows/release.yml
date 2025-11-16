@@ -25,7 +25,7 @@ jobs:
       id: tag
       run: echo "::set-output name=version::${GITHUB_REF#refs/tags/}"
 
-    - name: Build binaries
+    - name: Build binaries and create archives
       run: |
         mkdir -p release
         platforms=("windows/amd64" "darwin/amd64" "darwin/arm64" "linux/amd64" "linux/arm64")
@@ -38,7 +38,18 @@ jobs:
           fi
           export GOOS=$os
           export GOARCH=$arch
-          go build -o "release/atlanta-$os-$arch$suffix" .
+          binary_name="atlanta$suffix"
+          go build -o "$binary_name" .
+          
+          # Create archive
+          if [ "$os" = "windows" ]; then
+            zip -j "release/atlanta-$os-$arch.zip" "$binary_name"
+          else
+            tar -czf "release/atlanta-$os-$arch.tar.gz" "$binary_name"
+          fi
+          
+          # Clean up binary
+          rm "$binary_name"
         done
 
     - name: Create release
